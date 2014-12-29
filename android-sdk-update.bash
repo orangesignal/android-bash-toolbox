@@ -3,9 +3,8 @@
 shell_dir=$(dirname ${BASH_SOURCE:-$0})
 source "$shell_dir/android-sdk-download.bash"
 
-build_tools_dir="$ANDROID_HOME/build-tools"
-
 echo "Validating Android SDK - $ANDROID_HOME"
+build_tools_dir="$ANDROID_HOME/build-tools"
 filter=''
 
 # latest build-tools
