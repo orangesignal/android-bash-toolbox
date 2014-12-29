@@ -110,7 +110,7 @@ if [[ ! -d "$DEPLOYER_HOME" ]]; then
 fi
 
 # Local repository deploy
-#"$M2_HOME/bin/mvn" -e -f "$DEPLOYER_HOME/pom.xml" install
+"$M2_HOME/bin/mvn" -e -f "$DEPLOYER_HOME/pom.xml" install
 
 # In-House repository deploy
 # $HOME/.m2/settings.xml - Sonatype Nexus OSS example
