@@ -110,7 +110,14 @@ if [[ ! -d "$DEPLOYER_HOME" ]]; then
 fi
 
 # Local repository deploy
-#"$M2_HOME/bin/mvn" -e -f "$DEPLOYER_HOME/pom.xml" install
+local_repo="$HOME/.m2/repository"
+#local_repo="$DEPLOYER_HOME/.m2/repository"
+deploy_repo="$DEPLOYER_HOME/m2repository"
+if test "$local_repo" = "$deploy_repo"; then
+	echo "ERROR - deploy_repo parameter"
+	exit 1
+fi
+"$M2_HOME/bin/mvn" -Dmaven.repo.local="$local_repo" --errors --file "$DEPLOYER_HOME/pom.xml" install
 
 # In-House repository deploy
 # $HOME/.m2/settings.xml - Sonatype Nexus OSS example
@@ -153,6 +160,22 @@ function deploy() {
 			return 1
 		fi
 
+		# apklib
+		file="${prefix}.apklib"
+		if [[ -f "$file" ]]; then
+			url="${deploy_url%/}$(echo "$file" | sed "s/${escaped_repo_path}//g")"
+			status=$(curl --ipv4 --location --output /dev/null --silent --write-out '%{http_code}' $url)
+			if test "$status" = '404'; then
+				"$M2_HOME/bin/mvn" -e deploy:deploy-file \
+					-DgroupId=$groupId -DartifactId=$artifactId -Dversion=$version \
+					-Dfile="$file" -Dpackaging=apklib  -DgeneratePom=false \
+					-Durl=$deploy_url -DrepositoryId=$server_id
+			elif test "$status" != '200'; then
+				echo "ERROR - $file upload failed: $status"
+				return 1
+			fi
+		fi
+
 		# javadoc.jar
 		file="${prefix}-javadoc.jar"
 		if [[ -f "$file" ]]; then
@@ -187,19 +210,20 @@ function deploy() {
 	done
 }
 
-echo 'Deploy Android Support Repository'
+echo 'Deploying Android Support Repository'
 deploy "$ANDROID_HOME/extras/android/m2repository"
 echo 'Deploy Google Repository'
 deploy "$ANDROID_HOME/extras/google/m2repository"
 
-echo 'Deploy Maven Android SDK Deployer Repository'
-rm -rf "$DEPLOYER_HOME/m2repository"
-mkdir -p "$DEPLOYER_HOME/m2repository"
-cp -R "$HOME/.m2/repository/android" "$DEPLOYER_HOME/m2repository"
-mkdir -p "$DEPLOYER_HOME/m2repository/com/android"
-cp -R "$HOME/.m2/repository/com/android/future" "$DEPLOYER_HOME/m2repository/com/android"
-mkdir -p "$DEPLOYER_HOME/m2repository/com/google"
-cp -R "$HOME/.m2/repository/com/google/android" "$DEPLOYER_HOME/m2repository/com/google"
+function copydir() {
+	echo "Copying $1 to $2"
+	mkdir -p "$2"
+	cp -R "$1" "$2"
+}
 
-deploy "$DEPLOYER_HOME/m2repository"
-rm -rf "$DEPLOYER_HOME/m2repository"
+rm -rf "$deploy_repo"
+copydir "$local_repo/android" "$deploy_repo"
+copydir "$local_repo/com/android/future" "$deploy_repo/com/android"
+copydir "$local_repo/com/google/android" "$deploy_repo/com/google"
+echo 'Deploying Maven Android SDK Deployer Repository'
+deploy "$deploy_repo"
