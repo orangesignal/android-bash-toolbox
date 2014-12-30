@@ -13,9 +13,20 @@ testIsInstalled git
 testIsInstalled java
 set -e
 
+# $HOME/.m2/settings.xml - Sonatype Nexus OSS example
+# <servers>
+#   <server>
+#     <id>nexus</id>
+#     <username>admin</username>
+#     <password>admin123</password>
+#   </server>
+# </servers>
+#
+deploy_url='http://localhost:8081/nexus/content/repositories/thirdparty/'
+server_id='nexus'
+
 M2_HOME="${PWD}/apache-maven-3.1.1"
 DEPLOYER_HOME="${PWD}/maven-android-sdk-deployer"
-
 
 shell_dir=$(dirname ${BASH_SOURCE:-$0})
 source "$shell_dir/android-sdk-download.bash"
@@ -43,10 +54,10 @@ results=$("$ANDROID_HOME/tools/android" list sdk --extended --no-ui)
 list=$(echo "$results" | grep 'id:' | cut -d \" -f2)
 for item in ${list}; do
 	case "$item" in
-		build-tools-* )
+		platform-tools )
 			filter="${filter},${item}"
 			;;
-		platform-tools )
+		build-tools-* )
 			filter="${filter},${item}"
 			;;
 		android-* )
@@ -119,21 +130,13 @@ if test "$local_repo" = "$deploy_repo"; then
 fi
 "$M2_HOME/bin/mvn" -Dmaven.repo.local="$local_repo" --errors --file "$DEPLOYER_HOME/pom.xml" install
 
-# In-House repository deploy
-# $HOME/.m2/settings.xml - Sonatype Nexus OSS example
-# <servers>
-#   <server>
-#     <id>nexus</id>
-#     <username>admin</username>
-#     <password>admin123</password>
-#   </server>
-# </servers>
-#
-deploy_url='http://localhost:8081/nexus/content/repositories/thirdparty/'
-server_id='nexus'
-
 function deploy() {
 	repo_path="$1"
+	echo "Deploying $repo_path"
+	if [[ ! -d "$$repo_path" ]]; then
+		echo "$repo_path firectory not found."
+		return 1
+	fi
 	escaped_repo_path=$(echo "$repo_path" | sed 's/\//\\\//g')
 	for pom in $(find "$repo_path" -type f -name "*.pom"); do
 		echo "$pom"
@@ -151,7 +154,7 @@ function deploy() {
 		url="${deploy_url%/}$(echo "$file" | sed "s/${escaped_repo_path}//g")"
 		status=$(curl --ipv4 --location --output /dev/null --silent --write-out '%{http_code}' $url)
 		if test "$status" = '404'; then
-			"$M2_HOME/bin/mvn" -e deploy:deploy-file \
+			"$M2_HOME/bin/mvn" --errors deploy:deploy-file \
 				-DpomFile="$pom" \
 				-Dfile="$file" \
 				-Durl=$deploy_url -DrepositoryId=$server_id
@@ -166,7 +169,7 @@ function deploy() {
 			url="${deploy_url%/}$(echo "$file" | sed "s/${escaped_repo_path}//g")"
 			status=$(curl --ipv4 --location --output /dev/null --silent --write-out '%{http_code}' $url)
 			if test "$status" = '404'; then
-				"$M2_HOME/bin/mvn" -e deploy:deploy-file \
+				"$M2_HOME/bin/mvn" --errors deploy:deploy-file \
 					-DgroupId=$groupId -DartifactId=$artifactId -Dversion=$version \
 					-Dfile="$file" -Dpackaging=apklib  -DgeneratePom=false \
 					-Durl=$deploy_url -DrepositoryId=$server_id
@@ -182,7 +185,7 @@ function deploy() {
 			url="${deploy_url%/}$(echo "$file" | sed "s/${escaped_repo_path}//g")"
 			status=$(curl --ipv4 --location --output /dev/null --silent --write-out '%{http_code}' $url)
 			if test "$status" = '404'; then
-				"$M2_HOME/bin/mvn" -e deploy:deploy-file \
+				"$M2_HOME/bin/mvn" --errors deploy:deploy-file \
 					-DgroupId=$groupId -DartifactId=$artifactId -Dversion=$version \
 					-Dfile="$file" -Dpackaging=jar -Dclassifier=javadoc -DgeneratePom=false \
 					-Durl=$deploy_url -DrepositoryId=$server_id
@@ -198,7 +201,7 @@ function deploy() {
 			url="${deploy_url%/}$(echo "$file" | sed "s/${escaped_repo_path}//g")"
 			status=$(curl --ipv4 --location --output /dev/null --silent --write-out '%{http_code}' $url)
 			if test "$status" = '404'; then
-				"$M2_HOME/bin/mvn" -e deploy:deploy-file \
+				"$M2_HOME/bin/mvn" --errors deploy:deploy-file \
 					-DgroupId=$groupId -DartifactId=$artifactId -Dversion=$version \
 					-Dfile="$file" -Dpackaging=jar -Dclassifier=sources -DgeneratePom=false \
 					-Durl=$deploy_url -DrepositoryId=$server_id
@@ -210,20 +213,20 @@ function deploy() {
 	done
 }
 
-echo 'Deploying Android Support Repository'
-deploy "$ANDROID_HOME/extras/android/m2repository"
-echo 'Deploy Google Repository'
-deploy "$ANDROID_HOME/extras/google/m2repository"
-
 function copydir() {
 	echo "Copying $1 to $2"
 	mkdir -p "$2"
 	cp -R "$1" "$2"
 }
 
-rm -rf "$deploy_repo"
-copydir "$local_repo/android" "$deploy_repo"
-copydir "$local_repo/com/android/future" "$deploy_repo/com/android"
-copydir "$local_repo/com/google/android" "$deploy_repo/com/google"
-echo 'Deploying Maven Android SDK Deployer Repository'
-deploy "$deploy_repo"
+# In-House repository deploy
+if test "$deploy_url" != ''; then
+	deploy "$ANDROID_HOME/extras/android/m2repository"
+	deploy "$ANDROID_HOME/extras/google/m2repository"
+
+	rm -rf "$deploy_repo"
+	copydir "$local_repo/android" "$deploy_repo"
+	copydir "$local_repo/com/android/future" "$deploy_repo/com/android"
+	copydir "$local_repo/com/google/android" "$deploy_repo/com/google"
+	deploy "$deploy_repo"
+fi
