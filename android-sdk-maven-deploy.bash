@@ -131,13 +131,13 @@ fi
 "$M2_HOME/bin/mvn" -Dmaven.repo.local="$local_repo" --errors --file "$DEPLOYER_HOME/pom.xml" install
 
 function deploy() {
-	repo_path="$1"
+	local repo_path="$1"
 	echo "Deploying $repo_path"
-	if [[ ! -d "$$repo_path" ]]; then
+	if [[ ! -d "$repo_path" ]]; then
 		echo "$repo_path firectory not found."
 		return 1
 	fi
-	escaped_repo_path=$(echo "$repo_path" | sed 's/\//\\\//g')
+	local escaped_repo_path=$(echo "$repo_path" | sed 's/\//\\\//g')
 	for pom in $(find "$repo_path" -type f -name "*.pom"); do
 		echo "$pom"
 		prefix="${pom%.*}"
