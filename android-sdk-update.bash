@@ -56,7 +56,14 @@ if test "$filter" = ''; then
 fi
 
 echo 'Update Android SDK...'
-"$ANDROID_HOME/tools/android" update sdk --filter $filter --no-ui --all
+expect -c "
+set timeout -1
+spawn $ANDROID_HOME/tools/android update sdk --filter $filter --no-ui --all
+expect { 
+	\"Do you accept the license\" { exp_send \"y\r\" ; exp_continue }
+	eof
+}
+"
 # --dry-mode
 
 if [[ -d "$build_tools_dir" ]]; then
