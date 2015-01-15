@@ -78,7 +78,15 @@ done
 filter=${filter#,}
 if test "$filter" != ''; then
 	echo 'Update Android SDK...'
-	"$ANDROID_HOME/tools/android" update sdk --filter $filter --no-ui --all
+
+expect -c "
+set timeout -1
+spawn $ANDROID_HOME/tools/android update sdk --filter $filter --no-ui --all
+expect { 
+	\"Do you accept the license\" { exp_send \"y\r\" ; exp_continue }
+	eof
+}
+"
 
 	if [[ -d "$build_tools_dir" ]]; then
 		for ver in $(ls -1r "$build_tools_dir"); do
