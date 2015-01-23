@@ -122,15 +122,15 @@ fi
 
 # Maven Android SDK Deployer
 if [[ ! -d "$DEPLOYER_HOME" ]]; then
-	set +x
+	set -x
 	git --version
 	git clone --depth 1 --single-branch -b master https://github.com/simpligility/maven-android-sdk-deployer "$DEPLOYER_HOME"
-	set -x
+	set +x
 fi
 
 # Local repository deploy
-local_repo="$HOME/.m2/repository"
-#local_repo="$DEPLOYER_HOME/.m2/repository"
+#local_repo="$HOME/.m2/repository"
+local_repo="$DEPLOYER_HOME/.m2/repository"
 deploy_repo="$DEPLOYER_HOME/m2repository"
 if test "$local_repo" = "$deploy_repo"; then
 	echo "ERROR - deploy_repo parameter"
@@ -149,10 +149,10 @@ function deploy() {
 	for pom in $(find "$repo_path" -type f -name "*.pom"); do
 		echo "$pom"
 		prefix="${pom%.*}"
-		groupId=$(xpath "$pom" "//project/groupId/text()" 2>/dev/null)
-		artifactId=$(xpath "$pom" "//project/artifactId/text()" 2>/dev/null)
-		version=$(xpath "$pom" "//project/version/text()" 2>/dev/null)
-		packaging=$(xpath "$pom" "//project/packaging/text()" 2>/dev/null)
+		groupId=$(xpath -e "//project/groupId/text()" "$pom" 2>/dev/null)
+		artifactId=$(xpath -e "//project/artifactId/text()" "$pom" 2>/dev/null)
+		version=$(xpath -e "//project/version/text()" "$pom" 2>/dev/null)
+		packaging=$(xpath -e "//project/packaging/text()" "$pom" 2>/dev/null)
 		if test "$packaging" = ''; then
 			packaging='jar'
 		fi
